@@ -14,17 +14,11 @@ import (
 	"github.com/cilium/ebpf/link"
 	"github.com/cilium/ebpf/perf"
 
-	"xdp-agent/config"
-	"xdp-agent/rules"
-	"xdp-agent/utils"
+	"github.com/ebpf-shield/bpf-agent/configs"
+	"github.com/ebpf-shield/bpf-agent/models"
+	"github.com/ebpf-shield/bpf-agent/rules"
+	"github.com/ebpf-shield/bpf-agent/utils"
 )
-
-type Event struct {
-	SrcIP    uint32
-	DestPort uint16
-	Proto    uint8
-	Allowed  uint8
-}
 
 func ipToStr(ip uint32) string {
 	return net.IPv4(byte(ip), byte(ip>>8), byte(ip>>16), byte(ip>>24)).String()
@@ -32,10 +26,11 @@ func ipToStr(ip uint32) string {
 
 func main() {
 	if len(os.Args) != 2 {
-		log.Fatalf("Usage: %s <interface>", os.Args[0])
+		panic("Usage: xdp_firewall <interface>")
 	}
+
 	ifaceName := os.Args[1]
-	cfg := config.Load()
+	cfg := configs.Load()
 
 	spec, err := ebpf.LoadCollectionSpec("xdp_firewall.o")
 	if err != nil {
@@ -106,16 +101,16 @@ func main() {
 				log.Printf("Perf read error: %v", err)
 				continue
 			}
-			var ev Event
-			if err := binary.Read(bytes.NewReader(record.RawSample), binary.LittleEndian, &ev); err != nil {
+			var event models.Event
+			if err := binary.Read(bytes.NewReader(record.RawSample), binary.LittleEndian, &event); err != nil {
 				log.Printf("Failed to decode event: %v", err)
 				continue
 			}
 			action := "❌ BLOCKED"
-			if ev.Allowed == 1 {
+			if event.Allowed == 1 {
 				action = "✅ ALLOWED"
 			}
-			log.Printf("[IN] %s:%d -> %s", ipToStr(ev.SrcIP), ev.DestPort, action)
+			log.Printf("[IN] %s:%d -> %s", ipToStr(event.SrcIP), event.DestPort, action)
 		}
 	}()
 

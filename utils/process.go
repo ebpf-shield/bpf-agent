@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"xdp-agent/config"
+	"github.com/ebpf-shield/bpf-agent/configs"
 )
 
 type ProcessInfo struct {
@@ -42,7 +42,7 @@ func ListProcesses() []ProcessInfo {
 	return processes
 }
 
-func SendProcessList(cfg config.Config, procs []ProcessInfo) {
+func SendProcessList(cfg configs.Config, procs []ProcessInfo) {
 	data, _ := json.MarshalIndent(procs, "", "  ")
 	timestamp := time.Now().Format("20060102_150405")
 	_ = os.WriteFile(filepath.Join("debug_agent_logs", "debug_sent_"+timestamp+".json"), data, 0644)
