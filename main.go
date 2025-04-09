@@ -42,7 +42,7 @@ func main() {
 
 	client := client.GetClient()
 
-	spec, err := ebpf.LoadCollectionSpec("xdp_firewall.c")
+	spec, err := ebpf.LoadCollectionSpec("xdp_firewall.o")
 	if err != nil {
 		log.Fatalf("Failed to load BPF spec: %v", err)
 	}
