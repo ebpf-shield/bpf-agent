@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/binary"
 	"log"
 	"net"
@@ -13,26 +14,35 @@ import (
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/link"
 	"github.com/cilium/ebpf/perf"
+	"go.mongodb.org/mongo-driver/v2/bson"
 
-	"github.com/ebpf-shield/bpf-agent/configs"
+	"github.com/ebpf-shield/bpf-agent/client"
 	"github.com/ebpf-shield/bpf-agent/models"
 	"github.com/ebpf-shield/bpf-agent/rules"
 	"github.com/ebpf-shield/bpf-agent/utils"
 )
 
 func ipToStr(ip uint32) string {
-	return net.IPv4(byte(ip), byte(ip>>8), byte(ip>>16), byte(ip>>24)).String()
+	b := make([]byte, 4)
+	binary.LittleEndian.PutUint32(b, ip)
+	return net.IP(b).String()
 }
 
 func main() {
 	if len(os.Args) != 2 {
-		panic("Usage: xdp_firewall <interface>")
+		log.Fatalln("Usage: xdp_firewall <interface>")
 	}
 
 	ifaceName := os.Args[1]
-	cfg := configs.Load()
 
-	spec, err := ebpf.LoadCollectionSpec("xdp_firewall.o")
+	iface, err := net.InterfaceByName(ifaceName)
+	if err != nil {
+		log.Fatalf("Interface %s not found: %v", ifaceName, err)
+	}
+
+	client := client.GetClient()
+
+	spec, err := ebpf.LoadCollectionSpec("xdp_firewall.c")
 	if err != nil {
 		log.Fatalf("Failed to load BPF spec: %v", err)
 	}
@@ -41,15 +51,11 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to create BPF collection: %v", err)
 	}
+	defer coll.Close()
 
 	prog := coll.Programs["xdp_firewall_prog"]
 	if prog == nil {
 		log.Fatalf("Missing program: xdp_firewall_prog")
-	}
-
-	iface, err := net.InterfaceByName(ifaceName)
-	if err != nil {
-		log.Fatalf("Interface %s not found: %v", ifaceName, err)
 	}
 
 	lnk, err := link.AttachXDP(link.XDPOptions{
@@ -80,19 +86,25 @@ func main() {
 	}
 	defer reader.Close()
 
-	stop := make(chan os.Signal, 1)
-	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
 
 	go func() {
 		for {
-			procs := utils.ListProcesses()
-			utils.SendProcessList(cfg, procs)
-			rules.SyncRules(cfg.GetURL, rulesMap)
+			processess := utils.ListProcesses()
+			id := bson.NewObjectID()
+			err := client.Process.ReplaceProcesses(processess, id)
+			if err != nil {
+				log.Printf("Failed to send process list: %v", err)
+				continue
+			}
+
+			rules.SyncRules(rulesMap)
 			time.Sleep(30 * time.Second)
 		}
 	}()
 
-	log.Println("📡 Listening for events...")
+	log.Println("Listening for events...")
 
 	go func() {
 		for {
@@ -114,6 +126,6 @@ func main() {
 		}
 	}()
 
-	<-stop
+	<-ctx.Done()
 	log.Println("🛑 Agent stopped")
 }

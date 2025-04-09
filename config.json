@@ -1,5 +1,0 @@
-{
-  "agentId": "67e953023196ce5f19bd959a",
-  "postUrl": "http://localhost:8080/api/process/agent/67e953023196ce5f19bd959a",
-  "getUrl": "http://localhost:8080/api/process/agent/67e953023196ce5f19bd959a/command/rules"
-}

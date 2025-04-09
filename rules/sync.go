@@ -1,17 +1,12 @@
 package rules
 
 import (
-	"bytes"
 	"encoding/binary"
-	"encoding/json"
 	"log"
 	"net"
-	"net/http"
-	"os"
-	"path/filepath"
-	"time"
 
 	"github.com/cilium/ebpf"
+	"github.com/ebpf-shield/bpf-agent/client"
 	"github.com/google/gopacket/layers"
 )
 
@@ -22,36 +17,10 @@ type RuleKey struct {
 	Padding  uint8
 }
 
-type Rule struct {
-	Saddr    string `json:"saddr"`
-	Dport    uint16 `json:"dport"`
-	Protocol string `json:"protocol"`
-	Action   string `json:"action"`
-	Chain    string `json:"chain"`
-}
-
-type RuleSet struct {
-	Command string `json:"command"`
-	Rules   []Rule `json:"rules"`
-}
-
-func SyncRules(getURL string, rulesMap *ebpf.Map) {
-	resp, err := http.Get(getURL)
+func SyncRules(rulesMap *ebpf.Map) error {
+	ruleSet, err := client.GetClient().Process.GetRulesByCommand()
 	if err != nil {
-		log.Printf("GET failed: %v", err)
-		return
-	}
-	defer resp.Body.Close()
-
-	var buf bytes.Buffer
-	_, _ = buf.ReadFrom(resp.Body)
-	timestamp := time.Now().Format("20060102_150405")
-	_ = os.WriteFile(filepath.Join("debug_agent_logs", "debug_received_"+timestamp+".json"), buf.Bytes(), 0644)
-
-	var payload []RuleSet
-	if err := json.Unmarshal(buf.Bytes(), &payload); err != nil {
-		log.Printf("Failed to parse rules JSON: %v", err)
-		return
+		return err
 	}
 
 	// Clear old rules
@@ -65,7 +34,7 @@ func SyncRules(getURL string, rulesMap *ebpf.Map) {
 	}
 
 	// Add new rules
-	for _, entry := range payload {
+	for _, entry := range ruleSet {
 		for _, rule := range entry.Rules {
 			if rule.Chain != "INPUT" || rule.Action != "ACCEPT" {
 				continue
@@ -84,6 +53,8 @@ func SyncRules(getURL string, rulesMap *ebpf.Map) {
 			}
 		}
 	}
+
+	return nil
 }
 
 func parseProtocol(proto string) uint8 {

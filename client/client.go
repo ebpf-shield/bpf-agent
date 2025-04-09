@@ -1,19 +1,44 @@
 package client
 
 import (
+	"fmt"
 	"log"
+	"sync"
 
 	"github.com/ebpf-shield/bpf-agent/configs"
 	"resty.dev/v3"
 )
 
-func New() *resty.Client {
+var (
+	initRestyClient sync.Once
+	client          *clientImpl
+)
+
+type clientImpl struct {
+	restyClient *resty.Client
+	Process     processService
+}
+
+func GetClient() *clientImpl {
+	initRestyClient.Do(func() {
+		client = newClient()
+	})
+
+	return client
+}
+
+func newClient() *clientImpl {
 	client := resty.New()
 	backendUrl, err := configs.GetEnv("BACKEND_URL")
 	if err != nil {
 		log.Fatalf("Failed to get BACKEND_URL: %v", err)
 	}
 
-	client.SetBaseURL(backendUrl)
-	return client
+	baseUrl := fmt.Sprintf("%s/api/ui", backendUrl)
+	client.SetBaseURL(baseUrl)
+
+	return &clientImpl{
+		restyClient: client,
+		Process:     &processServiceImpl{restyClient: client},
+	}
 }
