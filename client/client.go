@@ -37,8 +37,10 @@ func newClient() *clientImpl {
 	baseUrl := fmt.Sprintf("%s/api/ui", backendUrl)
 	client.SetBaseURL(baseUrl)
 
+	processService := newProcessService(client)
+
 	return &clientImpl{
 		restyClient: client,
-		Process:     &processServiceImpl{restyClient: client},
+		Process:     processService,
 	}
 }

@@ -8,6 +8,7 @@ import (
 	"github.com/cilium/ebpf"
 	"github.com/ebpf-shield/bpf-agent/client"
 	"github.com/google/gopacket/layers"
+	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
 type RuleKey struct {
@@ -18,7 +19,7 @@ type RuleKey struct {
 }
 
 func SyncRules(rulesMap *ebpf.Map) error {
-	ruleSet, err := client.GetClient().Process.GetRulesByCommand()
+	ruleSet, err := client.GetClient().Process.FindByAgentIdWithRulesByCommand(bson.NewObjectID())
 	if err != nil {
 		return err
 	}

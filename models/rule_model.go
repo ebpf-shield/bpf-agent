@@ -9,6 +9,6 @@ type Rule struct {
 }
 
 type GetRulesByCommandDTO struct {
-	Command string `json:"command"`
+	Command string `json:"command" validate:"required"`
 	Rules   []Rule `json:"rules"`
 }
