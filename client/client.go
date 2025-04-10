@@ -34,7 +34,7 @@ func newClient() *clientImpl {
 		log.Fatalf("Failed to get BACKEND_URL: %v", err)
 	}
 
-	baseUrl := fmt.Sprintf("%s/api/ui", backendUrl)
+	baseUrl := fmt.Sprintf("%s/api/host", backendUrl)
 	client.SetBaseURL(baseUrl)
 
 	processService := newProcessService(client)

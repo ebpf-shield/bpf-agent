@@ -28,7 +28,7 @@ func newProcessService(restyClient *resty.Client) processService {
 
 func (p *processServiceImpl) ReplaceProcesses(processes []models.Process, agentId bson.ObjectID) error {
 	routeUrl := fmt.Sprintf("%s/agent/%s", processPrefix, agentId.Hex())
-	res, err := p.restyClient.R().SetBody(processes).Post(routeUrl)
+	res, err := p.restyClient.R().SetBody(processes).Patch(routeUrl)
 	if err != nil {
 		return err
 	}
