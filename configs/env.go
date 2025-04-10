@@ -2,6 +2,7 @@ package configs
 
 import (
 	"fmt"
+	"log"
 	"sync"
 
 	"github.com/ebpf-shield/bpf-agent/errors/apperrors"
@@ -19,7 +20,7 @@ func InitEnv() {
 		envs = make(map[string]*string)
 		env, err := godotenv.Read()
 		if err != nil {
-			panic(err)
+			log.Fatalln("Could not initialize env's")
 		}
 
 		for key, value := range env {

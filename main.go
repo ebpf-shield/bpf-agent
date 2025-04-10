@@ -17,6 +17,7 @@ import (
 	"go.mongodb.org/mongo-driver/v2/bson"
 
 	"github.com/ebpf-shield/bpf-agent/client"
+	"github.com/ebpf-shield/bpf-agent/configs"
 	"github.com/ebpf-shield/bpf-agent/models"
 	"github.com/ebpf-shield/bpf-agent/rules"
 	"github.com/ebpf-shield/bpf-agent/utils"
@@ -40,7 +41,8 @@ func main() {
 		log.Fatalf("Interface %s not found: %v", ifaceName, err)
 	}
 
-	client := client.GetClient()
+	configs.InitEnv()
+	httpClient := client.GetClient()
 
 	spec, err := ebpf.LoadCollectionSpec("xdp_firewall.o")
 	if err != nil {
@@ -93,7 +95,7 @@ func main() {
 		for {
 			processess := utils.ListProcesses()
 			id := bson.NewObjectID()
-			err := client.Process.ReplaceProcesses(processess, id)
+			err := httpClient.Process.ReplaceProcesses(processess, id)
 			if err != nil {
 				log.Printf("Failed to send process list: %v", err)
 				continue
