@@ -26,34 +26,6 @@ struct
     __type(value, struct rule_val_s);
 } firewall_rules SEC(".maps");
 
-static __always_inline char *ip_to_str(__u32 ip, char *buf, int buflen)
-{
-    if (!buf || buflen < 16)
-        return NULL;
-
-    __u8 bytes[4];
-    bytes[0] = (ip >> 24) & 0xFF;
-    bytes[1] = (ip >> 16) & 0xFF;
-    bytes[2] = (ip >> 8) & 0xFF;
-    bytes[3] = ip & 0xFF;
-
-    // We need to match how bpf_snprintf expects arguments:
-    // - format string
-    // - array of 64-bit values (Elf64_Addr*) for the format args
-
-    Elf64_Addr data[4];
-    data[0] = bytes[0];
-    data[1] = bytes[1];
-    data[2] = bytes[2];
-    data[3] = bytes[3];
-
-    const char fmt[] = "%d.%d.%d.%d";
-
-    bpf_snprintf(buf, buflen, fmt, data, 4);
-
-    return buf;
-}
-
 SEC("cgroup/connect4")
 int log_connect(struct bpf_sock_addr *ctx)
 {
