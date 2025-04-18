@@ -14,13 +14,15 @@ import (
 
 type firewallCmdKeyS struct{ Comm [16]int8 }
 
-type firewallRuleValS struct {
-	Proto  uint8
-	_      [3]byte
-	Daddr  uint32
-	Dport  uint16
-	Action uint8
-	_      [1]byte
+type firewallRuleArrayS struct {
+	Rules [1024]struct {
+		Proto  uint8
+		_      [3]byte
+		Daddr  uint32
+		Dport  uint16
+		Action uint8
+		_      [1]byte
+	}
 }
 
 // loadFirewall returns the embedded CollectionSpec for firewall.

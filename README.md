@@ -1,17 +1,19 @@
 # eBPF Agent
 
-## XDP Firewall
+## Firewall
 
 ```bash
-clang -O2 -g -target bpf -c ./bpf/xdp_firewall.c -o xdp_firewall.o
-go build -o xdp-firewall main.go
-./xdp_firewall ens33
-```
 
-# Print EBPF logs
-cat /sys/kernel/debug/tracing/trace_pipe
+# Print eBPF logs
+`bpftool prog tracelog`
 
 # Backend
 ```bash
 uvicorn main:app --host 0.0.0.0 --port 8080
 ```
+
+### Inbound
+We are interested in src(remote) ip and dest(local) port
+
+### Outbound
+We are interested in dest(remote) ip and port

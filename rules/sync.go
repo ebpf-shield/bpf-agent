@@ -19,7 +19,7 @@ type RuleKey struct {
 }
 
 func SyncRules(rulesMap *ebpf.Map) error {
-	ruleSet, err := client.GetClient().Process.FindByAgentIdWithRulesByCommand(bson.NewObjectID())
+	ruleSet, err := client.GetClient().Process().FindByAgentIdWithRulesByCommand(bson.NewObjectID())
 	if err != nil {
 		return err
 	}

@@ -14,12 +14,34 @@ var (
 	client          *clientImpl
 )
 
-type clientImpl struct {
-	restyClient *resty.Client
-	Process     processService
+// TODO: Does it really needs to be an interface
+type Client interface {
+	Close()
+	Process() processService
+	Agent() agentService
 }
 
-func GetClient() *clientImpl {
+type clientImpl struct {
+	restyClient *resty.Client
+	process     processService
+	agent       agentService
+}
+
+func (c *clientImpl) Close() {
+	if c.restyClient != nil {
+		c.restyClient.Close()
+	}
+}
+
+func (c *clientImpl) Process() processService {
+	return c.process
+}
+
+func (c *clientImpl) Agent() agentService {
+	return c.agent
+}
+
+func GetClient() Client {
 	initRestyClient.Do(func() {
 		client = newClient()
 	})
@@ -38,9 +60,11 @@ func newClient() *clientImpl {
 	client.SetBaseURL(baseUrl)
 
 	processService := newProcessService(client)
+	agentService := newAgentService(client)
 
 	return &clientImpl{
 		restyClient: client,
-		Process:     processService,
+		process:     processService,
+		agent:       agentService,
 	}
 }
