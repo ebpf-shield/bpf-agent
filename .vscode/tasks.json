@@ -7,7 +7,7 @@
             "command": "bash",
             "args": [
                 "-lc",
-                "go generate && go build -gcflags=all='-N -l' -o ${workspaceFolder}/debug_firewall ."
+                "go generate && go build -o debug_firewall -gcflags=all='-N -l' -o ${workspaceFolder}/debug_firewall ."
             ],
             "options": {
                 "cwd": "${workspaceFolder}"

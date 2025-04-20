@@ -51,8 +51,10 @@ func (a *agentServiceImpl) ExistsById(agentId bson.ObjectID) (bool, error) {
 	validator := configs.GetValidator()
 
 	resStruct := &struct {
-		Exists bool `json:"exists" validate:"required,boolean"`
-	}{}
+		Exists bool `json:"exists" validate:"boolean"`
+	}{
+		Exists: false,
+	}
 
 	res, err := a.restyClient.R().SetResult(resStruct).Get(routeUrl)
 	if err != nil {
