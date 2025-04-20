@@ -1,0 +1,75 @@
+package client
+
+import (
+	"fmt"
+
+	"github.com/ebpf-shield/bpf-agent/configs"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"resty.dev/v3"
+)
+
+type agentService interface {
+	Create(agentId bson.ObjectID) error
+	ExistsById(agentId bson.ObjectID) (bool, error)
+}
+
+const agentPrefix = "/agent"
+
+type agentServiceImpl struct {
+	restyClient *resty.Client
+}
+
+func newAgentService(restyClient *resty.Client) agentService {
+	return &agentServiceImpl{
+		restyClient: restyClient,
+	}
+}
+
+func (a *agentServiceImpl) Create(agentId bson.ObjectID) error {
+	routeUrl := fmt.Sprint(agentPrefix)
+
+	body := struct {
+		Id bson.ObjectID `json:"_id"`
+	}{
+		Id: agentId,
+	}
+
+	res, err := a.restyClient.R().SetBody(body).Post(routeUrl)
+	if err != nil {
+		return err
+	}
+
+	if res.IsError() {
+		return res.Err
+	}
+
+	return nil
+}
+
+func (a *agentServiceImpl) ExistsById(agentId bson.ObjectID) (bool, error) {
+	routeUrl := fmt.Sprintf("%s/exists/%s", agentPrefix, agentId.Hex())
+	validator := configs.GetValidator()
+
+	resStruct := &struct {
+		Exists bool `json:"exists" validate:"required,boolean"`
+	}{}
+
+	res, err := a.restyClient.R().SetResult(resStruct).Get(routeUrl)
+	if err != nil {
+		return false, err
+	}
+
+	if err := validator.Struct(resStruct); err != nil {
+		return false, err
+	}
+
+	if res.IsError() {
+		return false, res.Err
+	}
+
+	if resStruct.Exists {
+		return true, nil
+	}
+
+	return false, nil
+}

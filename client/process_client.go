@@ -11,7 +11,7 @@ import (
 
 type processService interface {
 	ReplaceProcesses(processes []models.Process, agentId bson.ObjectID) error
-	FindByAgentIdWithRulesByCommand(agentId bson.ObjectID) ([]models.GetRulesByCommandDTO, error)
+	FindByAgentIdWithRulesByCommand(agentId bson.ObjectID) (*models.GetRulesByCommandDTO, error)
 }
 
 const processPrefix = "/process"
@@ -28,7 +28,14 @@ func newProcessService(restyClient *resty.Client) processService {
 
 func (p *processServiceImpl) ReplaceProcesses(processes []models.Process, agentId bson.ObjectID) error {
 	routeUrl := fmt.Sprintf("%s/agent/%s", processPrefix, agentId.Hex())
-	res, err := p.restyClient.R().SetBody(processes).Patch(routeUrl)
+
+	body := struct {
+		Processes []models.Process `json:"processes"`
+	}{
+		processes,
+	}
+
+	res, err := p.restyClient.R().SetBody(&body).Patch(routeUrl)
 	if err != nil {
 		return err
 	}
@@ -40,10 +47,10 @@ func (p *processServiceImpl) ReplaceProcesses(processes []models.Process, agentI
 	return nil
 }
 
-func (p *processServiceImpl) FindByAgentIdWithRulesByCommand(agentId bson.ObjectID) ([]models.GetRulesByCommandDTO, error) {
+func (p *processServiceImpl) FindByAgentIdWithRulesByCommand(agentId bson.ObjectID) (*models.GetRulesByCommandDTO, error) {
 	routeUrl := fmt.Sprintf("%s/agent/%s/command/rules", processPrefix, agentId.Hex())
 
-	result := new([]models.GetRulesByCommandDTO)
+	result := new(models.GetRulesByCommandDTO)
 	res, err := p.restyClient.R().SetResult(result).Get(routeUrl)
 	if err != nil {
 		return nil, err
@@ -57,5 +64,5 @@ func (p *processServiceImpl) FindByAgentIdWithRulesByCommand(agentId bson.Object
 		return nil, res.Err
 	}
 
-	return *result, nil
+	return result, nil
 }
