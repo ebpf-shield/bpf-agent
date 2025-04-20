@@ -1,0 +1,9 @@
+{
+    "files.associations": {
+        "bpf_endian.h": "c",
+        "bpf_helpers.h": "c",
+        "vmlinux.h": "c",
+        "if_ether.h": "c",
+        "in.h": "c"
+    }
+}
