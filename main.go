@@ -1,124 +1,71 @@
 package main
 
 import (
-	"bytes"
-	"encoding/binary"
+	"context"
 	"log"
-	"net"
-	"os"
 	"os/signal"
 	"syscall"
-	"time"
 
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/link"
-	"github.com/cilium/ebpf/perf"
-
-	"xdp-agent/config"
-	"xdp-agent/rules"
-	"xdp-agent/utils"
+	"github.com/ebpf-shield/bpf-agent/client"
+	"github.com/ebpf-shield/bpf-agent/configs"
+	ebpfloader "github.com/ebpf-shield/bpf-agent/ebpf_loader"
+	"github.com/ebpf-shield/bpf-agent/errors/apperrors"
 )
 
-type Event struct {
-	SrcIP    uint32
-	DestPort uint16
-	Proto    uint8
-	Allowed  uint8
-}
-
-func ipToStr(ip uint32) string {
-	return net.IPv4(byte(ip), byte(ip>>8), byte(ip>>16), byte(ip>>24)).String()
-}
-
 func main() {
-	if len(os.Args) != 2 {
-		log.Fatalf("Usage: %s <interface>", os.Args[0])
-	}
-	ifaceName := os.Args[1]
-	cfg := config.Load()
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
 
-	spec, err := ebpf.LoadCollectionSpec("xdp_firewall.o")
+	log.Println("Starting BPF agent...")
+
+	configs.InitEnv()
+	httpClient := client.GetClient()
+	defer httpClient.Close()
+
+	id, err := configs.InitAgentUUID()
+
 	if err != nil {
-		log.Fatalf("Failed to load BPF spec: %v", err)
+		if err != apperrors.ErrUUIDExists {
+			log.Fatalf("creating agent id: %v", err)
+		}
+
 	}
 
-	coll, err := ebpf.NewCollection(spec)
+	exists, err := httpClient.Agent().ExistsById(id)
 	if err != nil {
-		log.Fatalf("Failed to create BPF collection: %v", err)
+		log.Fatalf("checking agent existence: %v", err)
 	}
 
-	prog := coll.Programs["xdp_firewall_prog"]
-	if prog == nil {
-		log.Fatalf("Missing program: xdp_firewall_prog")
+	if !exists {
+		err = httpClient.Agent().Create(id)
+		if err != nil {
+			log.Fatalf("creating agent: %v", err)
+		}
 	}
 
-	iface, err := net.InterfaceByName(ifaceName)
+	objs, err := ebpfloader.LoadFirewallObjects()
 	if err != nil {
-		log.Fatalf("Interface %s not found: %v", ifaceName, err)
+		log.Fatalf("loading eBPF objects: %v", err)
 	}
+	defer objs.Close()
 
-	lnk, err := link.AttachXDP(link.XDPOptions{
-		Program:   prog,
-		Interface: iface.Index,
-		Flags:     link.XDPGenericMode,
+	cGroupPath := "/sys/fs/cgroup"
+	link, err := link.AttachCgroup(link.CgroupOptions{
+		Program: objs.LogConnect,
+		Attach:  ebpf.AttachCGroupInet4Connect,
+		Path:    cGroupPath,
 	})
+
 	if err != nil {
-		log.Fatalf("Failed to attach XDP: %v", err)
+		log.Fatalf("attaching program: %v", err)
 	}
-	defer lnk.Close()
+	defer link.Close()
 
-	log.Printf("🛡️  XDP firewall attached to %s", ifaceName)
+	go processWorker(ctx)
+	go ruleSyncWorker(ctx)
 
-	events := coll.Maps["events"]
-	if events == nil {
-		log.Fatalf("Missing 'events' map")
-	}
-
-	rulesMap := coll.Maps["rules"]
-	if rulesMap == nil {
-		log.Fatalf("Missing 'rules' map")
-	}
-
-	reader, err := perf.NewReader(events, os.Getpagesize())
-	if err != nil {
-		log.Fatalf("Failed to open perf buffer: %v", err)
-	}
-	defer reader.Close()
-
-	stop := make(chan os.Signal, 1)
-	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
-
-	go func() {
-		for {
-			procs := utils.ListProcesses()
-			utils.SendProcessList(cfg, procs)
-			rules.SyncRules(cfg.GetURL, rulesMap)
-			time.Sleep(30 * time.Second)
-		}
-	}()
-
-	log.Println("📡 Listening for events...")
-
-	go func() {
-		for {
-			record, err := reader.Read()
-			if err != nil {
-				log.Printf("Perf read error: %v", err)
-				continue
-			}
-			var ev Event
-			if err := binary.Read(bytes.NewReader(record.RawSample), binary.LittleEndian, &ev); err != nil {
-				log.Printf("Failed to decode event: %v", err)
-				continue
-			}
-			action := "❌ BLOCKED"
-			if ev.Allowed == 1 {
-				action = "✅ ALLOWED"
-			}
-			log.Printf("[IN] %s:%d -> %s", ipToStr(ev.SrcIP), ev.DestPort, action)
-		}
-	}()
-
-	<-stop
-	log.Println("🛑 Agent stopped")
+	<-ctx.Done()
+	log.Println("shutting down gracefully, press Ctrl+C again to force")
 }
