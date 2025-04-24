@@ -6,7 +6,7 @@
             "type": "shell",
             "command": "bash",
             "args": [
-                "-l",
+                "-c",
                 "go generate && go build -o debug_firewall -gcflags=all='-N -l' -o ${workspaceFolder}/debug_firewall ."
             ],
             "options": {
