@@ -8,12 +8,10 @@ struct
     __uint(max_entries, 4096);
     __type(key, struct cmd_key_s);
     __type(value, struct rule_array_s);
-    // __array(value, struct rule_val_s);
 } firewall_rules SEC(".maps");
 
 static long callback_fn(__u32 index, void *_ctx)
 {
-    bpf_printk("callback_fn called\n");
     bpf_printk("index = %d\n", index);
     struct iter_ctx *ctx = (struct iter_ctx *)_ctx;
 
