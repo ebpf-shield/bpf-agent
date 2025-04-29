@@ -31,27 +31,32 @@ static long callback_fn(__u32 index, void *_ctx)
     {
         struct rule_val_s val = {};
         val.proto = ctx->sk->protocol;
+
+        // ntoh is network byte order to host byte order
         // bpf_ntohl is for u32
         val.daddr = bpf_ntohl(ctx->sk->user_ip4);
         // Short is for u16
         val.dport = bpf_ntohs(ctx->sk->user_port);
 
-        if (rule->daddr == val.daddr)
-        {
-            bpf_printk("Found rule %d %d %d\n", rule->proto, rule->daddr, rule->dport);
-            bpf_printk("ctx->sk->protocol = %d\n", ctx->sk->protocol);
+        // Logs
+        // bpf_printk("Found rule %d %d %d\n", rule->proto, rule->daddr, rule->dport);
+        // bpf_printk("val.daddr = %d\n", val.daddr);
+        // bpf_printk("val.dport = %d\n", val.dport);
 
+        if (rule->daddr == val.daddr &&
+            (rule->dport == 0 || rule->dport == val.dport))
+        {
+            /* decide verdict based on action */
             if (rule->action == RULE_FIREWALL_ALLOW)
             {
                 ctx->verdict = CONNECT_ALLOW;
-                return 1;
             }
             else
             {
                 bpf_printk("Denying connection\n");
                 ctx->verdict = CONNECT_DENY;
-                return 1;
             }
+            return 1;
         }
     }
 
