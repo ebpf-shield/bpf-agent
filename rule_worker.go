@@ -85,7 +85,7 @@ func ruleSyncWorker(ctx context.Context) {
 				}
 
 				firewallObjs.FirewallRules.Put(key, val)
-				log.Printf("Added %d rules for command %s:", len(item.Rules), item.Command)
+				log.Printf("Command %s have %d rules:", item.Command, len(item.Rules))
 
 			}
 		}
