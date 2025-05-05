@@ -26,7 +26,8 @@ struct rule_val_s
 {
     __u8 proto;
     // The address has to be kept in network byte order
-    __u32 daddr;
+    __u32 start_daddr;
+    __u32 end_daddr;
     __u16 dport;
     __u8 action;
 };

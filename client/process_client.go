@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/ebpf-shield/bpf-agent/configs"
+	"github.com/ebpf-shield/bpf-agent/errors/apperrors"
 	"github.com/ebpf-shield/bpf-agent/models"
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"resty.dev/v3"
@@ -41,6 +42,10 @@ func (p *processServiceImpl) ReplaceProcesses(processes []models.Process, agentI
 	}
 
 	if res.IsError() {
+		if res.Err == nil {
+			return apperrors.ErrUnknownResty
+		}
+
 		return res.Err
 	}
 
@@ -61,6 +66,10 @@ func (p *processServiceImpl) FindByAgentIdWithRulesByCommand(agentId bson.Object
 	}
 
 	if res.IsError() {
+		if res.Err == nil {
+			return nil, apperrors.ErrUnknownResty
+		}
+
 		return nil, res.Err
 	}
 

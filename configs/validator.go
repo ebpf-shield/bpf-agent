@@ -14,7 +14,6 @@ var (
 func GetValidator() *validator.Validate {
 	initValidatorOnce.Do(func() {
 		validate = validator.New()
-
 	})
 
 	return validate
