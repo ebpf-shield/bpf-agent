@@ -17,3 +17,19 @@ type RuleWithCommand struct {
 type GetRulesByCommandDTO struct {
 	RulesByCommand []RuleWithCommand `json:"rulesByCommand"`
 }
+
+/**
+{
+    __u8 proto;
+    // The address has to be kept in network byte order
+    __u32 daddr;
+    __u16 dport;
+    __u8 action;
+};*/
+
+type EbpfRule struct {
+	Proto  uint8  `json:"proto"`
+	Daddr  uint32 `json:"daddr"`
+	Dport  uint16 `json:"dport"`
+	Action uint8  `json:"action"`
+}

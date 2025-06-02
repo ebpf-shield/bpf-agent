@@ -11,7 +11,6 @@ import (
 type agentService interface {
 	Create(agentId bson.ObjectID) error
 	ExistsById(agentId bson.ObjectID) (bool, error)
-	GetProcessesToExcludeById(agentId bson.ObjectID) ([]string, error)
 }
 
 const agentPrefix = "/agent"
@@ -75,32 +74,4 @@ func (a *agentServiceImpl) ExistsById(agentId bson.ObjectID) (bool, error) {
 	}
 
 	return false, nil
-}
-
-func (a *agentServiceImpl) GetProcessesToExcludeById(agentId bson.ObjectID) ([]string, error) {
-	routeUrl := fmt.Sprintf("%s/%s/processes-to-exclude", agentPrefix, agentId.Hex())
-	validator := configs.GetValidator()
-
-	resStruct := &struct {
-		ProcessesToExclude []string `json:"processesToExclude" validate:"omitempty,min=1,max=100"`
-	}{}
-
-	res, err := a.restyClient.R().SetResult(resStruct).Get(routeUrl)
-	if err != nil {
-		return nil, err
-	}
-
-	if err := validator.Struct(resStruct); err != nil {
-		return nil, err
-	}
-
-	if res.IsError() {
-		return nil, res.Err
-	}
-
-	if len(resStruct.ProcessesToExclude) == 0 {
-		return nil, nil
-	}
-
-	return resStruct.ProcessesToExclude, nil
 }
