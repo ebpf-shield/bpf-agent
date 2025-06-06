@@ -11,7 +11,7 @@ import (
 )
 
 type processService interface {
-	ReplaceProcesses(processes []models.Process, agentId bson.ObjectID) error
+	ReplaceProcesses(r ReplaceProcessesDTO) error
 	FindByAgentIdWithRulesByCommand(agentId bson.ObjectID) (*models.GetRulesByCommandDTO, error)
 }
 
@@ -27,13 +27,21 @@ func newProcessService(restyClient *resty.Client) processService {
 	}
 }
 
-func (p *processServiceImpl) ReplaceProcesses(processes []models.Process, agentId bson.ObjectID) error {
-	routeUrl := fmt.Sprintf("%s/agent/%s", processPrefix, agentId.Hex())
+type ReplaceProcessesDTO struct {
+	Processes      []models.Process
+	AgentId        bson.ObjectID
+	OrganizationId bson.ObjectID
+}
+
+func (p *processServiceImpl) ReplaceProcesses(r ReplaceProcessesDTO) error {
+	routeUrl := fmt.Sprintf("%s/agent/%s", processPrefix, r.AgentId.Hex())
 
 	body := struct {
-		Processes []models.Process `json:"processes"`
+		Processes      []models.Process `json:"processes"`
+		OrganizationId bson.ObjectID    `json:"organizationId"`
 	}{
-		processes,
+		Processes:      r.Processes,
+		OrganizationId: r.OrganizationId,
 	}
 
 	res, err := p.restyClient.R().SetBody(&body).Patch(routeUrl)

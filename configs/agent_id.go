@@ -9,85 +9,178 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/ebpf-shield/bpf-agent/errors/apperrors"
 	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
-const UUIDPath = "/var/lib/ebshield/uuid"
+const EbShieldDir = "/var/lib/ebshield/"
+const AgentIDPath = EbShieldDir + "agent_id"
+const OrganizationIdPath = EbShieldDir + "org_id"
+
+const OrganizatioEnvName = "AGENT_ORG_ID"
+
+type RegisteredAgent struct {
+	ID             bson.ObjectID
+	OrganizationId bson.ObjectID
+}
 
 var (
-	agentId         bson.ObjectID
-	initAgentIdOnce sync.Once
+	registeredAgent RegisteredAgent
+	initAgentOnce   sync.Once
 )
 
-// getAgentUUID returns the existing UUID in uuidPath, or atomically
-// creates it (with a newly-generated uuid) on first run.
-func newAgentUUID() (bson.ObjectID, error) {
-	dir := filepath.Dir(UUIDPath)
-	// 1) Ensure the parent directory exists (owner: root, perms: 755)
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return agentId, fmt.Errorf("mkdir %s: %w", dir, err)
-	}
+func setAgentID(dir string) (bson.ObjectID, error) {
+	var id bson.ObjectID
 
-	// 2) Try to create the file exclusively
-	f, err := os.OpenFile(UUIDPath,
+	f, err := os.OpenFile(AgentIDPath,
 		os.O_CREATE|os.O_EXCL|os.O_WRONLY, // fail if exists
 		0o600,                             // user-read/write only
 	)
+
 	if err != nil {
 		if errors.Is(err, os.ErrExist) {
 			// Already created by a previous run → just read it
-			data, err := os.ReadFile(UUIDPath)
+			data, err := os.ReadFile(AgentIDPath)
 			if err != nil {
-				return agentId, fmt.Errorf("read existing uuid: %w", err)
+				return id, fmt.Errorf("read existing agent id: %w", err)
 			}
-			// We return an error to indicate that the UUID already exists
+			// We return an error to indicate that the AGENT ID already exists
 			// The caller checks for this error and not crash the program
 			hex := strings.TrimSpace(string(data))
 			id, err := bson.ObjectIDFromHex(hex)
 
 			if err != nil {
-				return agentId, fmt.Errorf("invalid uuid format: %s", hex)
+				return id, fmt.Errorf("invalid agent id format: %s", hex)
 			}
 
-			agentId = id
-			return agentId, apperrors.ErrUUIDExists
+			return id, nil
 		}
 
-		return agentId, fmt.Errorf("create uuid file: %w", err)
+		return id, fmt.Errorf("create agent id file: %w", err)
 	}
 
 	defer f.Close()
 
-	newID := bson.NewObjectID()
-	if _, err := f.WriteString(newID.Hex()); err != nil {
-		return agentId, fmt.Errorf("write uuid: %w", err)
+	id = bson.NewObjectID()
+	if _, err := f.WriteString(id.Hex()); err != nil {
+		return id, fmt.Errorf("write agent id: %w", err)
 	}
 
-	if err := os.Chmod(UUIDPath, 0o400); err != nil {
-		return agentId, fmt.Errorf("chmod read-only: %w", err)
+	if err := os.Chmod(AgentIDPath, 0o400); err != nil {
+		return id, fmt.Errorf("chmod read-only: %w", err)
 	}
 
-	return newID, nil
+	return id, nil
 }
 
-func GetAgentUUID() bson.ObjectID {
+func setOrganizationID(dir string) (bson.ObjectID, error) {
+	var id bson.ObjectID
+
+	f, err := os.OpenFile(OrganizationIdPath,
+		os.O_CREATE|os.O_EXCL|os.O_WRONLY, // fail if exists
+		0o600,                             // user-read/write only
+	)
+
+	if err != nil {
+		if errors.Is(err, os.ErrExist) {
+			// Already created by a previous run → just read it
+			data, err := os.ReadFile(OrganizationIdPath)
+			if err != nil {
+				return id, fmt.Errorf("read existing organization id: %w", err)
+			}
+
+			// We return an error to indicate that the ORGANIZATION ID already exists
+			// The caller checks for this error and not crash the program
+			hex := strings.TrimSpace(string(data))
+			id, err := bson.ObjectIDFromHex(hex)
+			if err != nil {
+				return id, fmt.Errorf("invalid organization id format: %s", hex)
+			}
+
+			return id, nil
+		}
+
+		return id, fmt.Errorf("create organization id file: %w", err)
+	}
+
+	defer f.Close()
+
+	orgIdStr := os.Getenv(OrganizatioEnvName)
+
+	if orgIdStr == "" {
+		return id, fmt.Errorf("environment variable %s is not set", OrganizatioEnvName)
+	}
+	id, err = bson.ObjectIDFromHex(orgIdStr)
+
+	if err != nil {
+		return id, fmt.Errorf("invalid organization id format: %s", orgIdStr)
+	}
+
+	if _, err := f.WriteString(id.Hex()); err != nil {
+		return id, fmt.Errorf("write organization id: %w", err)
+	}
+
+	if err := os.Chmod(OrganizationIdPath, 0o400); err != nil {
+		return id, fmt.Errorf("chmod read-only: %w", err)
+	}
+
+	return id, nil
+}
+
+// getAgentID returns the existing agent id in agent id Path, or automically
+// creates it (with a newly-generated agent id) on first run.
+func newRegisteredAgent() (RegisteredAgent, error) {
+	dir := filepath.Dir(EbShieldDir)
+	// 1) Ensure the parent directory exists (owner: root, perms: 755)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return registeredAgent, fmt.Errorf("mkdir %s: %w", dir, err)
+	}
+
+	agentId, err := setAgentID(dir)
+	if err != nil {
+		return registeredAgent, fmt.Errorf("set agent id: %w", err)
+	}
+
 	if agentId.IsZero() {
-		log.Fatalln("Agent UUID not initialized. Call InitAgentUUID() first.")
+		return registeredAgent, fmt.Errorf("agent id is zero, cannot proceed")
 	}
 
-	return agentId
+	registeredAgent.ID = agentId
+
+	orgId, err := setOrganizationID(dir)
+	if err != nil {
+		return registeredAgent, fmt.Errorf("set organization id: %w", err)
+	}
+
+	if orgId.IsZero() {
+		return registeredAgent, fmt.Errorf("organization id is zero, cannot proceed")
+	}
+
+	registeredAgent.OrganizationId = orgId
+
+	return registeredAgent, nil
 }
 
-func InitAgentUUID() (bson.ObjectID, error) {
+func GetRegisteredAgent() RegisteredAgent {
+	if registeredAgent.ID.IsZero() {
+		log.Fatalln("Agent ID not initialized. Call InitAgentID() first.")
+	}
+
+	if registeredAgent.OrganizationId.IsZero() {
+		log.Fatalln("Organization ID not initialized. Call InitAgentID() first.")
+	}
+
+	return registeredAgent
+}
+
+func InitAgent() (RegisteredAgent, error) {
 	var mainErr error
 
-	initAgentIdOnce.Do(func() {
-		uuid, err := newAgentUUID()
+	initAgentOnce.Do(func() {
+		agent, err := newRegisteredAgent()
 
 		mainErr = err
-		agentId = uuid
+		registeredAgent = agent
 	})
 
-	return agentId, mainErr
+	return registeredAgent, mainErr
 }

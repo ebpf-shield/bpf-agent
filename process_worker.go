@@ -64,7 +64,7 @@ func listProcesses(processesToExclude []string) []models.Process {
 
 func processWorker(ctx context.Context) {
 	httpClient := client.GetClient()
-	id := configs.GetAgentUUID()
+	registeredAgent := configs.GetRegisteredAgent()
 
 	tick := time.Tick(time.Second * 5)
 	for {
@@ -73,14 +73,18 @@ func processWorker(ctx context.Context) {
 			return
 
 		case <-tick:
-			processesToExclude, err := httpClient.Agent().GetProcessesToExcludeById(id)
+			processesToExclude, err := httpClient.Agent().GetProcessesToExcludeById(registeredAgent.ID)
 			if err != nil {
 				log.Printf("Failed to get processes to exclude: %v", err)
 			}
 
 			processess := listProcesses(processesToExclude)
 
-			err = httpClient.Process().ReplaceProcesses(processess, id)
+			err = httpClient.Process().ReplaceProcesses(client.ReplaceProcessesDTO{
+				Processes:      processess,
+				AgentId:        registeredAgent.ID,
+				OrganizationId: registeredAgent.OrganizationId,
+			})
 			if err != nil {
 				log.Printf("Failed to send process list: %v", err)
 				// TODO: return the error with errgroup

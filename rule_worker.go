@@ -68,7 +68,7 @@ func ruleSyncWorker(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-tick:
-			id := configs.GetAgentUUID()
+			id := configs.GetRegisteredAgent().ID
 			data, err := httpClient.Process().FindByAgentIdWithRulesByCommand(id)
 			if err != nil {
 				log.Println("Failed to get rules by command:", err)

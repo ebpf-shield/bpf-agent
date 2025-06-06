@@ -10,7 +10,7 @@ import (
 )
 
 type agentService interface {
-	Create(agentId bson.ObjectID) error
+	Create(createAgentDto CreateAgentDTO) error
 	ExistsById(agentId bson.ObjectID) (bool, error)
 	GetProcessesToExcludeById(agentId bson.ObjectID) ([]string, error)
 }
@@ -27,13 +27,20 @@ func newAgentService(restyClient *resty.Client) agentService {
 	}
 }
 
-func (a *agentServiceImpl) Create(agentId bson.ObjectID) error {
+type CreateAgentDTO struct {
+	Id             bson.ObjectID
+	OrganizationId bson.ObjectID
+}
+
+func (a *agentServiceImpl) Create(createAgentDto CreateAgentDTO) error {
 	routeUrl := fmt.Sprint(agentPrefix)
 
 	body := struct {
-		Id bson.ObjectID `json:"_id"`
+		Id             bson.ObjectID `json:"_id"`
+		OrganizationId bson.ObjectID `json:"organizationId"`
 	}{
-		Id: agentId,
+		Id:             createAgentDto.Id,
+		OrganizationId: createAgentDto.OrganizationId,
 	}
 
 	res, err := a.restyClient.R().SetBody(body).Post(routeUrl)
