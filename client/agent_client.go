@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/ebpf-shield/bpf-agent/configs"
+	"github.com/ebpf-shield/bpf-agent/errors/apperrors"
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"resty.dev/v3"
 )
@@ -48,6 +49,10 @@ func (a *agentServiceImpl) Create(createAgentDto CreateAgentDTO) error {
 	}
 
 	if res.IsError() {
+		if res.Err == nil {
+			return apperrors.ErrUnknownResty
+		}
+
 		return res.Err
 	}
 
@@ -74,6 +79,10 @@ func (a *agentServiceImpl) ExistsById(agentId bson.ObjectID) (bool, error) {
 	}
 
 	if res.IsError() {
+		if res.Err == nil {
+			return false, apperrors.ErrUnknownResty
+		}
+
 		return false, res.Err
 	}
 
