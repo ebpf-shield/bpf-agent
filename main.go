@@ -11,7 +11,6 @@ import (
 	"github.com/ebpf-shield/bpf-agent/client"
 	"github.com/ebpf-shield/bpf-agent/configs"
 	ebpfloader "github.com/ebpf-shield/bpf-agent/ebpf_loader"
-	"github.com/ebpf-shield/bpf-agent/errors/apperrors"
 )
 
 func main() {
@@ -24,22 +23,22 @@ func main() {
 	httpClient := client.GetClient()
 	defer httpClient.Close()
 
-	id, err := configs.InitAgentUUID()
+	registeredAgent, err := configs.InitAgent()
 
 	if err != nil {
-		if err != apperrors.ErrUUIDExists {
-			log.Fatalf("creating agent id: %v", err)
-		}
-
+		log.Fatalf("creating agent id: %v", err)
 	}
 
-	exists, err := httpClient.Agent().ExistsById(id)
+	exists, err := httpClient.Agent().ExistsById(registeredAgent.ID)
 	if err != nil {
 		log.Fatalf("checking agent existence: %v", err)
 	}
 
 	if !exists {
-		err = httpClient.Agent().Create(id)
+		err = httpClient.Agent().Create(client.CreateAgentDTO{
+			Id:             registeredAgent.ID,
+			OrganizationId: registeredAgent.OrganizationId,
+		})
 		if err != nil {
 			log.Fatalf("creating agent: %v", err)
 		}
