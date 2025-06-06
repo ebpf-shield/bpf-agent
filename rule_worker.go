@@ -53,7 +53,7 @@ func ruleSyncWorker(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-tick:
-			id := configs.GetAgentUUID()
+			id := configs.GetRegisteredAgent().ID
 			data, err := httpClient.Process().FindByAgentIdWithRulesByCommand(id)
 			if err != nil {
 				log.Println("Failed to get rules by command:", err)
@@ -85,7 +85,7 @@ func ruleSyncWorker(ctx context.Context) {
 				}
 
 				firewallObjs.FirewallRules.Put(key, val)
-				log.Printf("Added %d rules for command %s:", len(item.Rules), item.Command)
+				log.Printf("Command %s have %d rules:", item.Command, len(item.Rules))
 
 			}
 		}
