@@ -52,7 +52,7 @@ func main() {
 
 	cGroupPath := "/sys/fs/cgroup"
 	link, err := link.AttachCgroup(link.CgroupOptions{
-		Program: objs.LogConnect,
+		Program: objs.FilterConnections,
 		Attach:  ebpf.AttachCGroupInet4Connect,
 		Path:    cGroupPath,
 	})

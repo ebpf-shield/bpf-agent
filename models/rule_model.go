@@ -2,8 +2,8 @@ package models
 
 type Rule struct {
 	Saddr    string `json:"saddr" validate:"cidr"`
-	Sport    uint16 `json:"sport" validate:"gt=0,lt=65536"`
-	Dport    uint16 `json:"dport" validate:"gt=0,lt=65536"`
+	Sport    uint16 `json:"sport" validate:"gte=0,lt=65536"`
+	Dport    uint16 `json:"dport" validate:"gte=0,lt=65536"`
 	Daddr    string `json:"daddr" validate:"cidr"`
 	Protocol string `json:"protocol"`
 	Action   string `json:"action"`
@@ -12,8 +12,10 @@ type Rule struct {
 
 type RuleWithCommand struct {
 	Command string `json:"command" validate:"required,min=1"`
-	Rules   []Rule `json:"rules"`
+	Rules   []Rule `json:"rules" validate:"dive, required, gt=0"`
 }
 type GetRulesByCommandDTO struct {
 	RulesByCommand []RuleWithCommand `json:"rulesByCommand"`
 }
+
+type RulesByCommandMap map[string][]Rule

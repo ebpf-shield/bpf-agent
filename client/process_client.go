@@ -12,7 +12,7 @@ import (
 
 type processService interface {
 	ReplaceProcesses(r ReplaceProcessesDTO) error
-	FindByAgentIdWithRulesByCommand(agentId bson.ObjectID) (*models.GetRulesByCommandDTO, error)
+	FindByAgentIdWithRulesByCommand(agentId bson.ObjectID) (models.RulesByCommandMap, error)
 }
 
 const processPrefix = "/process"
@@ -60,7 +60,7 @@ func (p *processServiceImpl) ReplaceProcesses(r ReplaceProcessesDTO) error {
 	return nil
 }
 
-func (p *processServiceImpl) FindByAgentIdWithRulesByCommand(agentId bson.ObjectID) (*models.GetRulesByCommandDTO, error) {
+func (p *processServiceImpl) FindByAgentIdWithRulesByCommand(agentId bson.ObjectID) (models.RulesByCommandMap, error) {
 	routeUrl := fmt.Sprintf("%s/agent/%s/command/rules", processPrefix, agentId.Hex())
 
 	result := new(models.GetRulesByCommandDTO)
@@ -81,5 +81,11 @@ func (p *processServiceImpl) FindByAgentIdWithRulesByCommand(agentId bson.Object
 		return nil, res.Err
 	}
 
-	return result, nil
+	rulesByCommandMap := make(models.RulesByCommandMap)
+
+	for _, item := range result.RulesByCommand {
+		rulesByCommandMap[item.Command] = item.Rules
+	}
+
+	return rulesByCommandMap, nil
 }

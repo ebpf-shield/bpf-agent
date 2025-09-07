@@ -24,6 +24,7 @@ type firewallRuleArrayS struct {
 		Action     uint8
 		_          [1]byte
 	}
+	RuleCount int32
 }
 
 // loadFirewall returns the embedded CollectionSpec for firewall.
@@ -68,7 +69,7 @@ type firewallSpecs struct {
 //
 // It can be passed ebpf.CollectionSpec.Assign.
 type firewallProgramSpecs struct {
-	LogConnect *ebpf.ProgramSpec `ebpf:"log_connect"`
+	FilterConnections *ebpf.ProgramSpec `ebpf:"filter_connections"`
 }
 
 // firewallMapSpecs contains maps before they are loaded into the kernel.
@@ -123,12 +124,12 @@ type firewallVariables struct {
 //
 // It can be passed to loadFirewallObjects or ebpf.CollectionSpec.LoadAndAssign.
 type firewallPrograms struct {
-	LogConnect *ebpf.Program `ebpf:"log_connect"`
+	FilterConnections *ebpf.Program `ebpf:"filter_connections"`
 }
 
 func (p *firewallPrograms) Close() error {
 	return _FirewallClose(
-		p.LogConnect,
+		p.FilterConnections,
 	)
 }
 

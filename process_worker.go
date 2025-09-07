@@ -90,8 +90,6 @@ func processWorker(ctx context.Context) {
 				// TODO: return the error with errgroup
 				continue
 			}
-
-			log.Printf("Sent process list to server")
 		}
 	}
 }
