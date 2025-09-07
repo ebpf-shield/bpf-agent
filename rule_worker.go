@@ -2,61 +2,14 @@ package main
 
 import (
 	"context"
-	"encoding/binary"
 	"log"
-	"net"
 	"time"
 
 	"github.com/ebpf-shield/bpf-agent/client"
 	"github.com/ebpf-shield/bpf-agent/configs"
 	ebpfloader "github.com/ebpf-shield/bpf-agent/ebpf_loader"
-	"github.com/google/gopacket/layers"
+	"github.com/ebpf-shield/bpf-agent/utils"
 )
-
-func cidrRange(cidr string) (uint32, uint32, error) {
-	ip, ipnet, err := net.ParseCIDR(cidr)
-	if err != nil {
-		return 0, 0, err
-	}
-
-	// Start IP is simply the masked IP
-	start := ip.Mask(ipnet.Mask)
-
-	// End IP is calculated by setting all host bits to 1
-	end := make(net.IP, len(start))
-	copy(end, start)
-
-	for i := range end {
-		end[i] |= ^ipnet.Mask[i]
-	}
-
-	uint32Start := binary.BigEndian.Uint32(start)
-	uint32End := binary.BigEndian.Uint32(end)
-
-	return uint32Start, uint32End, nil
-}
-
-func parseProtocol(proto string) uint8 {
-	switch proto {
-	case "TCP":
-		return uint8(layers.IPProtocolTCP)
-	case "UDP":
-		return uint8(layers.IPProtocolUDP)
-	default:
-		return 0
-	}
-}
-
-func parseAction(action string) uint8 {
-	switch action {
-	case "ACCEPT":
-		return 1
-	case "DROP":
-		return 0
-	default:
-		return 0
-	}
-}
 
 func ruleSyncWorker(ctx context.Context) {
 	httpClient := client.GetClient()
@@ -76,39 +29,51 @@ func ruleSyncWorker(ctx context.Context) {
 				continue
 			}
 
-			for _, item := range data.RulesByCommand {
-				if item.Command == "" {
-					continue
-				}
+			key := ebpfloader.NewFirewallCmdKeySFromComm("")
+			val := ebpfloader.NewEmptyFirewallRuleArrayS()
 
-				if len(item.Rules) == 0 {
-					continue
-				}
-				key := ebpfloader.NewFirewallCmdKeySFromComm(item.Command)
-				val := ebpfloader.NewEmptyFirewallRuleArrayS()
+			iter := ebpfloader.GetFirewallObjects().FirewallRules.Iterate()
+			for iter.Next(key, val) {
+				comm := utils.IntArrayToString(key.Comm[:])
+				if rules, ok := data[comm]; ok {
+					newVal := ebpfloader.NewEmptyFirewallRuleArrayS()
+					newVal.RuleCount = int32(len(rules))
 
-				for i := range len(val.Rules) {
-					if i >= len(item.Rules) {
-						break
-					}
-
-					rule := item.Rules[i]
-					staddr, edaddr, err := cidrRange(rule.Daddr)
-					if err != nil {
-						log.Printf("Failed to parse CIDR %s: %v", rule.Daddr, err)
+					if newVal.RuleCount == 0 {
+						firewallObjs.FirewallRules.Put(key, newVal)
+						delete(data, comm)
 						continue
 					}
 
-					val.Rules[i].StartDaddr = staddr
-					val.Rules[i].EndDaddr = edaddr
-					val.Rules[i].Dport = rule.Dport
-					val.Rules[i].Proto = parseProtocol(rule.Protocol)
-					val.Rules[i].Action = parseAction(rule.Action)
+					for i, rule := range rules {
+						ebpfloader.SetRuleToFirewallRuleArrayEntry(rule, newVal, int32(i))
+					}
+
+					firewallObjs.FirewallRules.Put(key, newVal)
+					delete(data, comm)
+				} else {
+					ebpfloader.GetFirewallObjects().FirewallRules.Delete(key)
+				}
+			}
+
+			for comm, rules := range data {
+				key := ebpfloader.NewFirewallCmdKeySFromComm(comm)
+				newVal := ebpfloader.NewEmptyFirewallRuleArrayS()
+				newVal.RuleCount = int32(len(rules))
+
+				// We can do a lookup and then return error if exists
+				// err := firewallObjs.FirewallRules.Lookup(key, val)
+
+				if newVal.RuleCount == 0 {
+					firewallObjs.FirewallRules.Put(key, newVal)
+					continue
 				}
 
-				firewallObjs.FirewallRules.Put(key, val)
-				log.Printf("Command %s have %d rules:", item.Command, len(item.Rules))
+				for i, rule := range rules {
+					ebpfloader.SetRuleToFirewallRuleArrayEntry(rule, newVal, int32(i))
+				}
 
+				firewallObjs.FirewallRules.Put(key, newVal)
 			}
 		}
 	}

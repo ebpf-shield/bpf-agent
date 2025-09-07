@@ -35,4 +35,5 @@ struct rule_val_s
 struct rule_array_s
 {
     struct rule_val_s rules[MAX_RULES_PER_COMMAND];
+    int rule_count;
 };

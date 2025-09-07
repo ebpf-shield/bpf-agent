@@ -24,6 +24,7 @@ static long callback_fn(__u32 index, void *_ctx)
     struct rule_val_s *rule = &ctx->rules[index];
     if (!rule)
     {
+        // Continue the loop
         return 0;
     }
 
@@ -37,16 +38,18 @@ static long callback_fn(__u32 index, void *_ctx)
         __u16 dport = bpf_ntohs(ctx->sk->user_port);
 
         // Logs
-        // bpf_printk("Found rule %d %d %d\n", rule->proto, rule->daddr, rule->dport);
-        // bpf_printk("val.daddr = %d\n", val.daddr);
-        // bpf_printk("val.dport = %d\n", val.dport);
+        bpf_printk("Found rule %d %d %d %d\n", rule->proto, rule->start_daddr, rule->end_daddr, rule->dport);
 
-        if ((rule->start_daddr <= daddr && daddr >= rule->end_daddr) &&
+        bpf_printk("val.daddr = %d\n", daddr);
+        bpf_printk("val.dport = %d\n", dport);
+
+        if ((rule->start_daddr <= daddr && daddr <= rule->end_daddr) &&
             (rule->dport == 0 || rule->dport == dport))
         {
             /* decide verdict based on action */
             if (rule->action == RULE_FIREWALL_ALLOW)
             {
+                bpf_printk("Allowing connection\n");
                 ctx->verdict = CONNECT_ALLOW;
             }
             else
@@ -54,6 +57,8 @@ static long callback_fn(__u32 index, void *_ctx)
                 bpf_printk("Denying connection\n");
                 ctx->verdict = CONNECT_DENY;
             }
+
+            // Stop the loop
             return 1;
         }
     }
@@ -63,7 +68,7 @@ static long callback_fn(__u32 index, void *_ctx)
 
 SEC("cgroup/connect4")
 // TODO: Rename the function
-int log_connect(struct bpf_sock_addr *ctx)
+int filter_connections(struct bpf_sock_addr *ctx)
 {
     char comm[TASK_COMM_LEN];
     bpf_get_current_comm(comm, sizeof(comm));
