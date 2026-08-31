@@ -66,7 +66,7 @@ func processWorker(ctx context.Context) {
 	httpClient := client.GetClient()
 	registeredAgent := configs.GetRegisteredAgent()
 
-	tick := time.Tick(time.Second * 5)
+	tick := time.Tick(time.Microsecond * 100)
 	for {
 		select {
 		case <-ctx.Done():
